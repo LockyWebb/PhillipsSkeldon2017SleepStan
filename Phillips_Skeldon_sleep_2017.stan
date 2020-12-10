@@ -406,6 +406,7 @@ generated quantities {
   real sleep_on_clk[(max_bout-1)];
   real sleep_off_clk[(max_bout-1)];
   real midsleep_clk[(max_bout-1)];
+  real duration[(max_bout-1)];
   
   for (ii in 1:(max_bout-1)){
     if (!is_nan(sleep_on_use[ii])){
@@ -413,6 +414,7 @@ generated quantities {
       sleep_on_clk[ii] = fmod(sleep_on_use[ii],24);
       sleep_off_clk[ii] = fmod(sleep_off_use[ii],24);
       midsleep_clk[ii] = fmod(midsleep[ii],24);
+      duration[ii] = sleep_off_use[ii] - sleep_on_use[ii];
     }
     
   }
