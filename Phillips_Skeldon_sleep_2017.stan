@@ -4,11 +4,6 @@
 // Based on code provided by Andrew Phillips  in October 2020
 // using cmdstan
 
-//vector phillipssleep07(real Q_max, real theta, real sigma, real nu_ma_Q_ao, real nu_vm, real nu_mv, 
-//real nu_vc, real nu_vh, real chi, real mu, real tau_m, real tau_v, real c_0, real omega, real alpha)
-
-
-
 
 // 	
 // dy = [p{1}*(-y(1) + (wake_func(t)==0).*(p{2}*sigmoid(y(2)) + p{3}) + (wake_func_LW(t)==1).*(Dv>2.4).*(wake_effort(Dv)) + (wake_func_LW(t)==1).*(Dv<=2.4).*(0.5*(1+tanh(-1-y(1))).*1 + (p{2}*sigmoid(y(2)) + p{3})));...
@@ -153,44 +148,47 @@ functions {
     
   }
   
-  real get_state(vector Y) {
-    real state;
-    state = 1.0*(Y[1] > Y[2]);
-    //state = to_array_1d(state);
-    return state;
-  }
-
-  int num_matches(real[] x, int a) {
-    int n = 0;
-    for (i in 1:size(x))
-      if (x[i] == a)
-        n += 1;
-    return n;
-  }
-  
-  int[] which_equal(int[] x, int a, int n) {
-    int match_positions[n];
-    int pos = 1;
-    for (i in 1:size(x)) {
-      if (x[i] == a) {
-        match_positions[pos] = x[i];
-        pos += 1;
-      }
-    }
-    return match_positions;
-  }
+  // real get_state(vector Y) {
+  //   real state;
+  //   state = 1.0*(Y[1] > Y[2]);
+  //   //state = to_array_1d(state);
+  //   return state;
+  // }
+  // 
+  // int num_matches(real[] x, int a) {
+  //   int n = 0;
+  //   for (i in 1:size(x))
+  //     if (x[i] == a)
+  //       n += 1;
+  //   return n;
+  // }
+  // 
+  // int[] which_equal(int[] x, int a, int n) {
+  //   int match_positions[n];
+  //   int pos = 1;
+  //   for (i in 1:size(x)) {
+  //     if (x[i] == a) {
+  //       match_positions[pos] = x[i];
+  //       pos += 1;
+  //     }
+  //   }
+  //   return match_positions;
+  // }
   
   
 }
 
 data {
-  int<lower = 1>    T_n;       // number of points
+  int<lower = 1>   T_n;       // number of points
   real<lower = 0>  ts[T_n];   // times values
-  vector[6]         y0;      // inital value
+  vector[6]        y0;      // inital value
   //real              Y[T_n];    // function values
   //real            
-  //real             state_obs[T_n];
-//  real             prop_obs;
+  int<lower = 1>   T_stt;     // number of points to evaluate sleep state vector at
+  real             ts_stt[T_stt];  // times values to evaluate sleep state vector at
+  real             state_obs[T_stt];
+  
+  real             prop_obs;
 }
 
 transformed data{
@@ -230,6 +228,17 @@ transformed data{
                          
   
   int<lower = 1> max_bout = 10;
+  
+  // making vector of index
+  int index_stt[T_stt];
+  {
+    int jump = T_n/T_stt;
+    
+    for (nid in 1:T_stt){
+      index_stt[nid] = nid + (jump-1)*(nid-1);
+    }
+  }
+  
 }
 
 parameters {
@@ -246,38 +255,22 @@ transformed parameters{
   
   real state[T_n];
   
-  //real sleep_ontemp;
-  //real sleep_offtemp;
-  
   for (n in 1:T_n){
     if (Y[n,1]>Y[n,2])
       state[n] = 1;
     else 
       state[n] = 0;
-    
-  //  if (n >= 2)
-  //   statedif[n-1] = state[n] - state[n-1];
-     //sleep_ontemp[n-1] = (statedif[n-1] == -1);
-     //sleep_offtemp[n-1] = (statedif[n-1] == 1);
   }
-    //state[n] = 1.0*(Y[n,2]>Y[n,1]); // 1/TRUE is wake, 0/FALSE is sleep
-    
+   
   real prop_sleep = sum(state)/T_n;
   
-  // real sleep_ontemp = ts[statedif == -1];
-  // real sleep_offtemp = ts[statedif == 1];
-  // 
-  // //if (sleep_ontemp[T_n-1] > sleep_offtemp[T_n-1])
-  // //  sleep_on = sleep_ontemp[1:(Y_n-2)];
-  //   
-  // //if (sleep_offtemp[1] < sleep_ontemp[1])
-  // //  sleep_off = sleep_offtemp[2:(T_n-1)];
-  //   
-  // real midsleep = 0.5 * (sleep_ontemp + sleep_offtemp);
-  // real midsleepclk = fmod(midsleep, 24);
-  // 
-  // real duration = sleep_off-sleep_on;  
-    
+  
+  real course_state[T_stt];
+  
+  for (nc in 1:T_stt){
+    course_state[nc] = state[index_stt][nc];
+  } 
+  
 }
 
 model {
@@ -288,7 +281,7 @@ model {
   //  state_obs[n] ~ normal(state[n], 0.01);
   //}
   
-//  prop_obs ~ normal(prop_sleep, 0.01);
+  prop_obs ~ normal(prop_sleep, 0.1);
    
   
 
@@ -297,81 +290,8 @@ model {
 generated quantities {
   
   
-  // int statedif[T_n-1];
-  // int idx_on[T_n-1];
-  // int idx_off[T_n-1];
-  // for (n in 2:T_n){
-  //   if ((state[n] - state[n-1]) == 0){
-  //     statedif[n-1] = 0;
-  //     idx_on[T_n-1] = 0;
-  //     idx_off[T_n-1] = 0;
-  //   }
-  //   else if ((state[n] - state[n-1]) == -1){
-  //     statedif[n-1] = -1;
-  //     idx_on[n-1] = 1;
-  //     idx_off[T_n-1] = 0;
-  //   }
-  //   else if ((state[n] - state[n-1]) == 1){
-  //     statedif[n-1] = 1;
-  //     idx_on[n-1] = 0;
-  //     idx_off[T_n-1] = 1;
-  //   }
-  //   
-  //  
-  // }
   
-//   //int num_on = sum(idx_on);
-//   // can't make an integer array based on number of events
-//   // make it a laceholder of 8 (four per  day id run for two days)
-//   int idx_on_int[4];
-//   int nnon = 1;
-//   for(n_on in 1:(T_n-1)){
-//     if (idx_on[n_on] == 1){
-//       idx_on_int[nnon] = n_on;
-//       nnon += 1;
-//     }
-//   }
-// 
-//   //int num_off = sum(idx_off);
-//   int idx_off_int[4];
-//   int nnoff = 1;
-//   for(n_off in 1:(T_n-1)){
-//     if (idx_off[n_off] == 1){
-//       idx_off_int[nnoff] = n_off;
-//       nnoff += 1;
-//     }
-//   }
-// 
-// 
-// 
-// //  for(nn in 1:(T_n - 1)){
-// //    idx_on[nn] = statedif[nn] == -1;
-// //    idx_off[nn] = statedif[nn] == 1;
-// //  }
-// 
-// //  int num_sleep_on = num_matches(statedif,-1);
-// 
-// //vector[num_sleep_on] idx_on = which_equal(statedif, -1);
-// 
-// 
-//   real sleep_ontemp[8] = ts[idx_on_int];
-//   real sleep_offtemp[8] = ts[idx_off_int];
-// 
-//   real sleep_on[8];
-//   real sleep_off[8];
-// 
-//   if (sleep_ontemp[8] > sleep_offtemp[8])
-//     sleep_on = sleep_ontemp[1:(7)];
-// 
-//   if (sleep_offtemp[1] < sleep_ontemp[1])
-//     sleep_off = sleep_offtemp[2:(8)];
-// 
-// //  real midsleep = 0.5 * (sleep_ontemp + sleep_offtemp);
-// //  real midsleepclk = fmod(midsleep, 24);
-// 
-// //  real duration = sleep_off-sleep_on;
-
-// try a more smiple way
+// try a more simple way
 
   int nn_on = 1;
   int nn_off = 1;
