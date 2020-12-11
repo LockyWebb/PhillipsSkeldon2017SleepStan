@@ -42,7 +42,8 @@ ests_sum <- fit$summary()
 #ests_manual_summary <- summarise_draws(fit$draws(), "mean", "median", "sd", "mad", "quantile2", .args = list(na.rm = TRUE))
 
 mcmc_hist(fit$draws("chi"))
-
+mcmc_hist(fit$draws("prop_sleep"))
+mcmc_hist(fit$draws("midsleep[1]")+24)
 
 draws_array <- fit$draws()
 str(draws_array)
